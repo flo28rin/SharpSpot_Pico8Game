@@ -1,0 +1,16 @@
+# adapted from https://cs.anu.edu.au/courses/comp1720/resources/faq/#statement-of-originality
+
+name: Florin-Nicolae Viorică
+
+declaration: >-
+  I declare that everything I have submitted in this assignment is entirely my
+  own work, with the following exceptions:
+
+code:
+  - comment: base code for tower defense game from youtube tutorial
+    url:
+        https://www.youtube.com/watch?v=wQYTGpbLVeA
+        https://www.youtube.com/watch?v=8MFqhg4Xcdc
+        https://www.youtube.com/watch?v=hQ_AVXMMsB8
+        https://www.youtube.com/watch?v=F3zbaMOjX_U
+    licence:
