@@ -192,7 +192,7 @@ function init_game()
 	if (level_selection == 2) then
 		spawn_rate = 10
 		global_enemy_speed = 0.8
-		player.kills = player_kills_change
+		player_kills_change = 0
 	end
 end
 
@@ -218,10 +218,11 @@ function draw_game()
 	draw_bullets()
 	draw_turrets()
 	draw_player()
+	
 	centre_text(
-		"♥"..player.health..
-		" $"..player.money..
-		" w:"..player.kills,
+		"♥"..flr(player.health)..
+		" $"..flr(player.money)..
+		" w:"..flr(player.kills),
 		88, 7)
 	local trt = turretatplayer()
 	if (trt == nil) then
@@ -313,6 +314,18 @@ function update_enemy(e)
 		return
 	end
 
+	local ds = distance(
+		e.px + 4, player.px + 4,
+		e.py + 4, player.py + 4)	
+	if (ds < 2) then
+		sfx(02)
+		player_kill()
+		player.health -= e.damage * 0.2
+		e.dead = true
+		del(enemies, e)
+		return
+	end
+
 	if (e.px < e.tx) then
 		e.px += e.speed
 	elseif (e.px > e.tx) then
@@ -358,7 +371,12 @@ function update_enemy(e)
 	end
 end
 
-player_kills_change = 100
+-- how many enemies you should kill until the game changes
+player_kills_change = 50
+-- the money multiplied by enemy speed
+global_money_multiplier = 20
+-- lowest enemy speed
+global_enemy_speed = 0.3
 
 function draw_enemy(e)
 	spr(e.spr + e.sprdelta, e.px, e.py)
@@ -739,13 +757,13 @@ music_change = false
 
 function player_kill()
 	sfx(01)
-	player.money += 50
+	player.money += global_money_multiplier * global_enemy_speed
 	player.kills += 1
 	if (player.kills % 10 == 0) then
 		spawn_rate -= 1
 		global_enemy_speed += 0.1
-		if (spawn_rate < 5) then
-			spawn_rate = 5
+		if (spawn_rate < 1) then
+			spawn_rate = 1
 		end
 		if (player.kills >= player_kills_change and not music_change) then
 			music(-1)
