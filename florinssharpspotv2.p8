@@ -15,6 +15,7 @@ __lua__
 
 function _init()
 	cf = 1
+	shake = 0
 	
 	change_state(
 		init_menu,
@@ -31,11 +32,11 @@ end
 
 function _update()
 	cf += 1
-	
 	cupdate()
 end
 
 function _draw()
+	doshake()
 	cdraw()
 end
 
@@ -46,6 +47,25 @@ function change_state(
 	cdraw = ndraw
 	
 	cinit()
+end
+
+function doshake()
+	if shake == 0 then
+		return
+	end
+	-- [-16 +16]
+	local shakex = 16 - rnd(32)
+	local shakey = 16 - rnd(32)
+
+	shakex = shakex * shake
+	shakey = shakey * shake
+
+	camera(shakex, shakey)
+
+	shake = shake * 0.95
+	if shake < 0.05 then
+		shake = 0
+	end
 end
 -->8
 -- main menu
@@ -145,13 +165,15 @@ end
 -->8
 -- player dead state
 
+endgamewait = 0
 function init_endgame()
-
+	endgamewait = 0
 end
 
 function update_endgame()
-	tcol = (tcol + 0.1) % 16	
-	if(btnp(❎)) do
+	endgamewait += 1
+	tcol = (tcol + 0.1) % 16
+	if(endgamewait >= 100 and btnp(❎)) do
 		sfx(06)
 		change_state(
 			init_menu,
@@ -235,6 +257,14 @@ function draw_game()
 				"level "..trt.level..
 				" upgrade for $"..(trt.level + 1) * 100,
 				98, 7)
+			-- THIS
+			-- local sx = 64 - flr(#str * 4 / 2)
+			local buildcol = 7
+			if player.money < (trt.level + 1) * 100 then
+				buildcol = 8
+			end
+			print("^ $"..(trt.level + 1) * 100, player.px - 8, player.py - (cf % 64) / 8 - 4, buildcol)
+			print("^", player.px - 8, player.py - (cf % 64) / 8 - 1, buildcol)
 		else
 			centre_text(
 				"level "..trt.level..
@@ -267,9 +297,11 @@ enemy_types = {
 }
 
 enemies = {}
+particles_death = {}
 
 function init_enemies()
 	enemies = {}
+	particles_death = {}
 end
 
 function update_enemies()
@@ -281,6 +313,10 @@ end
 function draw_enemies()
 	for e in all(enemies) do
 		draw_enemy(e)
+	end
+
+	for p in all (particles_death) do
+		circfill(p.px, p.py, p.radius, p.c)
 	end
 end
 
@@ -308,6 +344,7 @@ end
 
 function update_enemy(e)
 	if (e.health <= 0) then
+		add_death_particles(e)
 		player_kill()
 		e.dead = true
 		del(enemies, e)
@@ -318,9 +355,12 @@ function update_enemy(e)
 		e.px + 4, player.px + 4,
 		e.py + 4, player.py + 4)	
 	if (ds < 2) then
+		add_death_particles(e)
 		sfx(02)
 		player_kill()
 		player.health -= e.damage * 0.2
+		-- PLAYER DAMAGE TAKEN
+		shake = 0.1
 		e.dead = true
 		del(enemies, e)
 		return
@@ -331,13 +371,13 @@ function update_enemy(e)
 	elseif (e.px > e.tx) then
 		e.px -= e.speed
 	end
-	
+
 	if (e.py < e.ty) then
 		e.py += e.speed
 	elseif (e.py > e.ty) then
 		e.py -= e.speed
 	end
-	
+
 	if (abs(e.px - e.tx) 
 			< e.speed	and
 			abs(e.py - e.ty) 
@@ -361,13 +401,36 @@ function update_enemy(e)
 			end
 		end
 	end
-	
+
 	if (cf % 30 == 0) then
 		if (e.sprdelta == 1) then
 			e.sprdelta = 0
 		else
 			e.sprdelta = 1
 		end
+	end
+
+	for p in all(particles_death) do
+		p.life += 1
+		p.px += p.sx * 0.1
+		p.py += p.sy * 0.1
+		if p.life >= 60 then
+			del(particles_death, p)
+		end
+	end
+end
+
+function add_death_particles(e)
+	for i = 1, 8 do
+		add(particles_death, {
+			px = e.px + 4,
+			py = e.py + 4,
+			sx = rnd(2) - 1,
+			sy = rnd(2) - 1,
+			c = rnd(5) + 8,
+			radius = rnd(2) + 1,
+			life = 0
+		})
 	end
 end
 
@@ -458,7 +521,7 @@ function update_turret(t)
 	else
 		-- finding new enemy
 		-- should be the enemy closest to exit
-		index = 0
+		local index = 0
 		for e in all(enemies) do
 			local dist = distance(
 				t.px, e.px,
@@ -544,7 +607,7 @@ end
 function maybe_fire(t)
 	if (cf % t.rof == 0) then
 		add_bullet(t.px + 4, t.py + 4,
-			1, t.level * 1.2 + 1, t.enemy, t.level * 10 + 10)
+			1, t.level * 1.2 + 1, t.enemy, t.level * 10 + 10, t)
 	end
 end
 
@@ -581,24 +644,36 @@ end
 
 function add_bullet(
 		px, py, size, speed,
-		target, dmg)
+		target, dmg, trt)
 	local b = {}
 	b.px, b.py = px, py
 	b.size = size
 	b.speed = speed
 	b.target = target
 	b.damage = dmg
+	b.turret = trt
 	
 	add(bullets, b)
 end
 
 function update_bullet(b)
-	if (b.target.dead
-			or b.target.health <= 0) then
-		del(bullets, b)
+	if b.target == nil then
+		-- wait until target
+		b.target = b.turret.enemy
 		return
 	end
-	
+
+	if (b.target.dead or b.target.health <= 0) then
+		-- find new target
+		-- del(bullets, b)
+		b.target = b.turret.enemy
+	end
+
+	if b.target == nil then
+		-- wait until target
+		return
+	end
+
 	local r = atan2(
 		b.target.px + 4 - b.px,
 		b.target.py + 4 - b.py)
@@ -616,7 +691,7 @@ function update_bullet(b)
 end
 
 function draw_bullet(b)
-	circfill(b.px, b.py, b.size)
+	circfill(b.px, b.py, b.size, 7)
 end
 -->8
 -- player
@@ -640,8 +715,9 @@ function update_player()
 			init_endgame,
 			update_endgame,
 			draw_endgame)
-			sfx(04)
-			music(-1)
+		sfx(04)
+		music(-1)
+		shake = 2
 	end
 
 	if (cf % 20 == 0) then
@@ -775,10 +851,9 @@ end
 
 function inflict_damage(damage)
 	sfx(02)
-	player.health -= damage	
-	if (player.health <= 0) then
-	
-	end
+	player.health -= damage
+	-- PLAYER DAMAGE TAKEN
+	shake = 0.6
 end
 __gfx__
 0000000000eee0009999999999999999999999999999999999999999000000000000000000000000000000000000000000000000000000000000000000000000
@@ -801,8 +876,8 @@ __gfx__
 00011000000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00111100001111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00011000000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00199100001991000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01199110011991100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00100100001001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01100110011001100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00011100001110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00010100001010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0cc000c000c00c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
