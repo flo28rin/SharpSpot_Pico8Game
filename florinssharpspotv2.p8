@@ -220,11 +220,8 @@ end
 
 function update_game()
 	if (cf % spawn_rate == 0) then
-		-- printh("getting new enemy "..cf.."  "..spawn_rate)
 		add_enemy(48, 20,
 			global_enemy_speed, 10)
-	else
-		-- printh("getting new enemy "..cf.."  "..spawn_rate)
 	end
 	
 	update_enemies()
@@ -322,7 +319,6 @@ end
 
 function add_enemy(
 		espr, ehealth, espeed, edamage)
-	printh("add enemy")
 	local e = {}
 	e.spr = espr
 	e.sprdelta = 0
@@ -339,7 +335,6 @@ function add_enemy(
 	e.damage = edamage
 	
 	add(enemies, e)
-	printh("add enemy "..#enemies)
 end
 
 function update_enemy(e)
@@ -461,7 +456,6 @@ end
 
 function add_turret(ts, 
 		tpx, tpy, tr, rof)
-	-- printh("add new turret")
 	t = {}
 	t.s = ts -- sprite
 	t.sdelta = 0
@@ -476,7 +470,6 @@ function add_turret(ts,
 	t.level = 0
 	
 	add(turrets, t)
-	-- printh("add new turret end"..#turrets)
 end
 
 function update_turrets()
